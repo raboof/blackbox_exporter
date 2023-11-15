@@ -164,6 +164,18 @@ func ProbeGRPC(ctx context.Context, target string, module config.Module, registr
 	}
 
 	var opts []grpc.DialOption
+	if len(module.GRPC.SourceIPAddress) > 0 {
+		srcIP := net.ParseIP(module.GRPC.SourceIPAddress)
+		if srcIP == nil {
+			logger.Error("Error parsing source ip address", "srcIP", module.GRPC.SourceIPAddress)
+			return false
+		}
+		logger.Info("Using local address", "srcIP", srcIP)
+		opts = append(opts, grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
+			return (&net.Dialer{LocalAddr: &net.TCPAddr{IP: srcIP}}).DialContext(ctx, "tcp", addr)
+		}))
+	}
+
 	target = targetHost + ":" + targetPort
 	if !module.GRPC.TLS {
 		logger.Debug("Dialing GRPC without TLS")
