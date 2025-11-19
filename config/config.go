@@ -275,6 +275,7 @@ type HTTPProbe struct {
 	IPProtocol                   string                  `yaml:"preferred_ip_protocol,omitempty"`
 	IPProtocolFallback           bool                    `yaml:"ip_protocol_fallback,omitempty"`
 	SourceIPAddress              string                  `yaml:"source_ip_address,omitempty"`
+	SourceInterface              string                  `yaml:"source_interface,omitempty"`
 	SkipResolvePhaseWithProxy    bool                    `yaml:"skip_resolve_phase_with_proxy,omitempty"`
 	NoFollowRedirects            *bool                   `yaml:"no_follow_redirects,omitempty"`
 	FailIfSSL                    bool                    `yaml:"fail_if_ssl,omitempty"`
