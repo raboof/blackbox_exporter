@@ -33,6 +33,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/andybalholm/brotli"
@@ -415,14 +416,37 @@ func ProbeHTTP(ctx context.Context, target string, module config.Module, registr
 			}
 		}
 	}
-	client, err := pconfig.NewClientFromConfig(httpClientConfig, "http_probe", pconfig.WithKeepAlivesDisabled())
+
+	httpClientOptions := []pconfig.HTTPClientOption{
+		pconfig.WithKeepAlivesDisabled(),
+	}
+
+	if len(module.HTTP.SourceInterface) > 0 {
+		httpClientOptions = append(httpClientOptions,
+			pconfig.WithDialContextFunc((&net.Dialer{
+				Control: func(network, address string, c syscall.RawConn) error {
+					var err error
+					c.Control(func(fd uintptr) {
+						err = syscall.SetsockoptString(
+							int(fd),
+							syscall.SOL_SOCKET,
+							syscall.SO_BINDTODEVICE,
+							module.HTTP.SourceInterface,
+						)
+					})
+					return err
+				},
+			}).DialContext))
+	}
+
+	client, err := pconfig.NewClientFromConfig(httpClientConfig, "http_probe", httpClientOptions...)
 	if err != nil {
 		logger.Error("Error generating HTTP client", "err", err)
 		return false
 	}
 
 	httpClientConfig.TLSConfig.ServerName = ""
-	noServerName, err := pconfig.NewRoundTripperFromConfig(httpClientConfig, "http_probe", pconfig.WithKeepAlivesDisabled())
+	noServerName, err := pconfig.NewRoundTripperFromConfig(httpClientConfig, "http_probe", httpClientOptions...)
 	if err != nil {
 		logger.Error("Error generating HTTP client without ServerName", "err", err)
 		return false
