@@ -33,6 +33,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/andybalholm/brotli"
@@ -430,32 +431,21 @@ func ProbeHTTP(ctx context.Context, target string, module config.Module, registr
 		httpClientOptions = append(httpClientOptions,
 			pconfig.WithDialContextFunc((&net.Dialer{LocalAddr: &net.TCPAddr{IP: srcIP}}).DialContext))
 	} else if len(module.HTTP.SourceInterface) > 0 {
-		// schwarzeni
-		var (
-			ief   *net.Interface
-			addrs []net.Addr
-			srcIP net.IP
-		)
-		if ief, err = net.InterfaceByName(module.HTTP.SourceInterface); err != nil {
-			logger.Error("Error parsing interface", "interface", module.HTTP.SourceInterface, slog.String("error", err.Error()))
-			return false
-		}
-		if addrs, err = ief.Addrs(); err != nil {
-			logger.Error("Error getting addresses", "interface", module.HTTP.SourceInterface, slog.String("error", err.Error()))
-			return false
-		}
-		for _, addr := range addrs {
-			if srcIP = addr.(*net.IPNet).IP.To4(); srcIP != nil {
-				break
-			}
-		}
-		if srcIP == nil {
-			logger.Error("Interface has no IPv4 address", "interface", module.HTTP.SourceInterface)
-			return false
-		}
-		logger.Error("Using local address", "srcIP", srcIP)
 		httpClientOptions = append(httpClientOptions,
-			pconfig.WithDialContextFunc((&net.Dialer{LocalAddr: &net.TCPAddr{IP: srcIP}}).DialContext))
+			pconfig.WithDialContextFunc((&net.Dialer{
+				Control: func(network, address string, c syscall.RawConn) error {
+					var err error
+					c.Control(func(fd uintptr) {
+						err = syscall.SetsockoptString(
+							int(fd),
+							syscall.SOL_SOCKET,
+							syscall.SO_BINDTODEVICE,
+							module.HTTP.SourceInterface,
+						)
+					})
+					return err
+				},
+			}).DialContext))
 	}
 
 	client, err := pconfig.NewClientFromConfig(httpClientConfig, "http_probe", httpClientOptions...)
