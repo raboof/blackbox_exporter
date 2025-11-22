@@ -437,11 +437,11 @@ func ProbeHTTP(ctx context.Context, target string, module config.Module, registr
 			srcIP net.IP
 		)
 		if ief, err = net.InterfaceByName(module.HTTP.SourceInterface); err != nil {
-			logger.Error("Error parsing interface", "interface", module.HTTP.SourceInterface)
+			logger.Error("Error parsing interface", "interface", module.HTTP.SourceInterface, slog.String("error", err.Error()))
 			return false
 		}
 		if addrs, err = ief.Addrs(); err != nil {
-			logger.Error("Error getting addresses", "interface", module.HTTP.SourceInterface)
+			logger.Error("Error getting addresses", "interface", module.HTTP.SourceInterface, slog.String("error", err.Error()))
 			return false
 		}
 		for _, addr := range addrs {
@@ -453,7 +453,7 @@ func ProbeHTTP(ctx context.Context, target string, module config.Module, registr
 			logger.Error("Interface has no IPv4 address", "interface", module.HTTP.SourceInterface)
 			return false
 		}
-		logger.Info("Using local address", "srcIP", srcIP)
+		logger.Error("Using local address", "srcIP", srcIP)
 		httpClientOptions = append(httpClientOptions,
 			pconfig.WithDialContextFunc((&net.Dialer{LocalAddr: &net.TCPAddr{IP: srcIP}}).DialContext))
 	}
