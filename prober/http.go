@@ -33,7 +33,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/andybalholm/brotli"
@@ -422,21 +421,7 @@ func ProbeHTTP(ctx context.Context, target string, module config.Module, registr
 	}
 
 	if len(module.HTTP.SourceInterface) > 0 {
-		httpClientOptions = append(httpClientOptions,
-			pconfig.WithDialContextFunc((&net.Dialer{
-				Control: func(network, address string, c syscall.RawConn) error {
-					var err error
-					c.Control(func(fd uintptr) {
-						err = syscall.SetsockoptString(
-							int(fd),
-							syscall.SOL_SOCKET,
-							syscall.SO_BINDTODEVICE,
-							module.HTTP.SourceInterface,
-						)
-					})
-					return err
-				},
-			}).DialContext))
+		httpClientOptions = BindToInterface(httpClientOptions, module.HTTP.SourceInterface, logger)
 	}
 
 	client, err := pconfig.NewClientFromConfig(httpClientConfig, "http_probe", httpClientOptions...)
